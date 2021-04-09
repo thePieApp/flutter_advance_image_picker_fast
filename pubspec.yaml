@@ -29,7 +29,11 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.0
   multi_image_picker: ^4.8.0
-  image_editor_pro: ^1.0.9
+  photo_manager: 1.1.0
+  reorderables: 0.4.0
+  image_crop: 0.4.0
+
+#  image_editor_pro: ^1.0.9
 #  extended_image: 4.0.0
 #  image_editor: 1.0.0
 #  image_picker: 0.7.4

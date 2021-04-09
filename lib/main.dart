@@ -1,11 +1,14 @@
 import 'dart:io';
-import 'package:multi_image_picker/multi_image_picker.dart';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
-import 'package:image_editor_pro/image_editor_pro.dart';
+import 'package:flutter_advance_image_picker/lib/photo.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'package:reorderables/reorderables.dart';
+
+// import 'package:image_editor_pro/image_editor_pro.dart';
 // import 'package:extended_image/extended_image.dart';
-
-// import 'package:flutter_advance_image_picker/pieImageEditor.dart';
 
 void main() {
   runApp(MyApp());
@@ -34,101 +37,155 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
 
-  File _image;
+  List<AssetEntity> images = <AssetEntity>[];
+  List<File> imageFiles = <File>[];
+  List<Widget> imageWidgets = <Widget>[];
+  int maxImageNumber = 9;
+  int gridH = 0;
+  int gridV = 0;
 
-  List<Asset> images = <Asset>[];
-  int maxImageNumber = 6;
-  String _error = 'No Error Dectected';
+  int verticalSpacing = 10;
+  int horizontalSpacing = 10;
 
-  Widget buildGridView() {
-    return Padding(
-      padding: EdgeInsets.only(left: 10),
-      child: GridView.count(
-        crossAxisCount: 3,
-        childAspectRatio: 0.70,
-        children: List.generate(images.length+1, (index) {
-          print(index);
-          if (index == images.length){
-            if (images.length < maxImageNumber){
-              return selectionCard();
-            } else {
-              return Container();
-            }
-          }
-          Asset asset = images[index];
+  List<int> setSelectionWidgetPos(){
+    if (imageWidgets.length == 9){
+        gridV = -1;
+        gridH = -1;
+    } else {
+        gridV = (imageWidgets.length / 3.0).floor();
+        gridH = (imageWidgets.length - gridV*3);
+    }
+  }
 
-          return Stack(
-            children: [
-              Padding(
-                padding: EdgeInsets.only(left: 0,  top: 0, right: 10, bottom: 10),
-                child: ClipRRect(
-                  borderRadius: new BorderRadius.circular(8.0),
-                  child: AssetThumb(
-                    asset: asset,
-                    width: (MediaQuery.of(context).size.width/3).toInt(),
-                    height: (MediaQuery.of(context).size.width/3/0.70).toInt(),
+  Widget buildWidget(index, imageFile){
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: new BorderRadius.circular(5.0),
+          child: Container(
+            child: Image.file(
+              imageFile,
+              fit: BoxFit.cover,
+            ),
+            width: (MediaQuery.of(context).size.width-40)/3,
+            height: (MediaQuery.of(context).size.width-40)/3/0.80,
+          ),
+        ),
+        Positioned(
+            left: (MediaQuery.of(context).size.width-40)/3 * 0.65,
+            top: (MediaQuery.of(context).size.width-40)/3 * 0.65 / 0.72,
+            child: IconButton(
+                  icon: Icon(
+                    Icons.cancel,
+                    color: Colors.blue,
+                    size: 30,
                   ),
-                ),
-              ),
-              Positioned(
-                  left: (MediaQuery.of(context).size.width)/3 * 0.6,
-                  top: (MediaQuery.of(context).size.width)/3 * 0.6 / 0.62,
-                  child: IconButton(
-                      icon: Icon(
-                        Icons.cancel,
-                        color: Colors.blue,
-                        size: 30,
-                      ),
-                      onPressed: () => setState(() {
-                        images.removeAt(index);
+                  onPressed: () => setState(() {
+                    for (int i=0 ; i<images.length ; i++){
+                      if (imageFile.toString() == imageFiles[i].toString()) {
+                        images.removeAt(i);
+                        imageFiles.removeAt(i);
+                        imageWidgets.removeAt(i);
+                        setSelectionWidgetPos();
+                        break;
                       }
-                      )
-                  )
-              )
-            ],
-          );
-        }),
-      ),
+                    }
+                  }
+                )
+            )
+        ),
+      ],
     );
   }
 
+  void pickAsset() async {
+    List<AssetEntity> imagesTmp = await PhotoPicker.pickAsset(
+      context: context,
+      // BuildContext requied
 
-  Future<void> loadAssets() async {
-    List<Asset> resultList = <Asset>[];
-    String error = 'No Error Detected';
+      /// The following are optional parameters.
+      themeColor: Colors.orange,
+      // the title color and bottom color
+      padding: 1.0,
+      // item padding
+      dividerColor: Colors.grey,
+      // divider color
+      disableColor: Colors.white,
+      // the check box disable color
+      itemRadio: 0.88,
+      // the content item radio
+      maxSelected: maxImageNumber,
+      // max picker image count
+      provider: I18nProvider.chinese,
+      // i18n provider ,default is chinese. , you can custom I18nProvider or use ENProvider()
+      rowCount: 4,
+      // item row count
+      textColor: Colors.black,
+      // text color
+      thumbSize: (MediaQuery.of(context).size.width/4.0).floor(),
+      // preview thumb size , default is 64
+      sortDelegate: SortDelegate.common,
+      // default is common ,or you make custom delegate to sort your gallery
+      checkBoxBuilderDelegate: DefaultCheckBoxBuilderDelegate(
+        activeColor: Colors.white,
+        unselectedColor: Colors.white,
+        checkColor: Colors.blue,
+      ), // default is DefaultCheckBoxBuilderDelegate ,or you make custom delegate to create checkbox
 
-    try {
-      resultList = await MultiImagePicker.pickImages(
-        maxImages: maxImageNumber,
-        enableCamera: true,
-        selectedAssets: images,
-        cupertinoOptions: CupertinoOptions(takePhotoIcon: "chat"),
-        materialOptions: MaterialOptions(
-          actionBarColor: "#abcdef",
-          actionBarTitle: "Example App",
-          allViewTitle: "All Photos",
-          useDetailsView: false,
-          selectCircleStrokeColor: "#000000",
-        ),
-      );
-    } on Exception catch (e) {
-      error = e.toString();
-      return; // the image list remains unchanged
+      // loadingDelegate: this, // if you want to build custom loading widget,extends LoadingDelegate [see example/lib/main.dart]
+
+      badgeDelegate: const DefaultBadgeDelegate(), /// or custom class extends [BadgeDelegate]
+
+      pickType: PickType.onlyImage, // all/image/video
+
+      pickedAssetList: images, /// when [photoPathList] is not null , [pickType] invalid .
+    );
+
+    List<File> imageFilesTmp = <File>[];
+    List<Widget> imageWidgetsTmp = <Widget>[];
+    for ( int i = 0 ; i < imagesTmp.length ; i++ ){
+      File original_file = await imagesTmp[i].file;
+      imageFilesTmp.add(original_file);
+      imageWidgetsTmp.add(buildWidget(i, original_file));
     }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
     setState(() {
-      images = resultList;
-      _error = error;
+      images = imagesTmp;
+      imageFiles = imageFilesTmp;
+      imageWidgets = imageWidgetsTmp;
+      setSelectionWidgetPos();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+
+    void _onReorder(int oldIndex, int newIndex) {
+      setState(() {
+        Widget row = imageWidgets.removeAt(oldIndex);
+        imageWidgets.insert(newIndex, row);
+        File imageFile = imageFiles.removeAt(oldIndex);
+        imageFiles.insert(newIndex, imageFile);
+        AssetEntity image = images.removeAt(oldIndex);
+        images.insert(newIndex, image);
+      });
+    }
+
+    var wrap = ReorderableWrap(
+        minMainAxisCount: 3,
+        maxMainAxisCount: 3,
+        spacing: 10.0,
+        runSpacing: 10.0,
+        padding: const EdgeInsets.all(10),
+        children: imageWidgets,
+        onReorder: _onReorder,
+        onNoReorder: (int index) {
+          debugPrint('${DateTime.now().toString().substring(5, 22)} reorder cancelled. index:$index');
+        },
+        onReorderStarted: (int index) {
+          debugPrint('${DateTime.now().toString().substring(5, 22)} reorder started: index:$index');
+        }
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -141,53 +198,70 @@ class _MyHomePageState extends State<MyHomePage> {
         shadowColor: Colors.transparent,
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Center(child: Text('Error: $_error')),
-          ElevatedButton(
-            child: Text("Pick images"),
-            onPressed: (){
-              // Navigator.push(context, MaterialPageRoute(builder: (context) => ExtendedImageExample()));
-              getimageditor();
-            }
+          Center(child: Text('PIE Image Selection and Upload')),
+          Stack(
+            children: [
+              buildGridView(),
+              wrap,
+              gridV == -1 ? Container() : Positioned(
+                child: selectionCard(),
+                left: 10 + ( (MediaQuery.of(context).size.width-40)/3 + 10 ) * gridH,
+                top: 10 + ( (MediaQuery.of(context).size.width-40)/3/0.80 + 10 ) * gridV,
+              ),
+            ],
           ),
-          Expanded(
-            child: buildGridView(),
-          )
         ],
       ),
     );
   }
 
-  Future<void> getimageditor() =>
-      Navigator.push(context, MaterialPageRoute(builder: (context) {
-        return ImageEditorPro(
-          appBarColor: Colors.blue,
-          bottomBarColor: Colors.blue,
-        );
-      })).then((geteditimage) {
-        if (geteditimage != null) {
-          setState(() {
-            _image = geteditimage;
-          });
-        }
-      }).catchError((er) {
-        print(er);
-      });
-
   Widget selectionCard() => GestureDetector(
-    onTap: loadAssets,
-    child:   Padding(
-      padding: EdgeInsets.only(right: 10, bottom: 15),
-      child: ClipRRect(
-        borderRadius: new BorderRadius.circular(10.0),
-        child: Container(
-          color: Colors.black12,
-          child: Icon(
-              Icons.add
-          ),
-        ),
+    onTap: pickAsset,
+    child:   Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(5.0),
+        border: Border.all(color: Colors.black),
+      ),
+      width: (MediaQuery.of(context).size.width-40)/3,
+      height: (MediaQuery.of(context).size.width-40)/3/0.80,
+      child: Icon(
+          Icons.add
       ),
     ),
   );
+
+  Widget displayCard(Color color) => Container(
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(5.0),
+      border: Border.all(color: Colors.transparent),
+    ),
+    width: (MediaQuery.of(context).size.width-40)/3,
+    height: (MediaQuery.of(context).size.width-40)/3/0.80,
+  );
+
+  Widget buildGridView() {
+    return Padding(
+      padding: EdgeInsets.only(left: 10, right: 10, top: 10),
+      child: GridView.count(
+        controller: ScrollController(),
+        shrinkWrap: true,
+        crossAxisCount: 3,
+        childAspectRatio: 0.80,
+        mainAxisSpacing: verticalSpacing.toDouble(),
+        crossAxisSpacing: horizontalSpacing.toDouble(),
+        children: List.generate(maxImageNumber, (index) {
+          if ( index < imageWidgets.length ) {
+            return displayCard(Colors.transparent);
+          } else {
+            return displayCard(Colors.black12);
+          }
+        }),
+      ),
+    );
+  }
 
 }

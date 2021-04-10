@@ -1,14 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import 'package:flutter_advance_image_picker/lib/photo.dart';
-import 'package:photo_manager/photo_manager.dart';
 import 'package:reorderables/reorderables.dart';
-
-// import 'package:image_editor_pro/image_editor_pro.dart';
-// import 'package:extended_image/extended_image.dart';
+import 'package:multi_image_picker/multi_image_picker.dart';
+import 'package:flutter_absolute_path/flutter_absolute_path.dart';
 
 void main() {
   runApp(MyApp());
@@ -37,55 +35,66 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
 
-  List<AssetEntity> images = <AssetEntity>[];
+  List<Asset> images = <Asset>[];
   List<File> imageFiles = <File>[];
   List<Widget> imageWidgets = <Widget>[];
   int maxImageNumber = 9;
+  int gridSize = 3;
   int gridH = 0;
   int gridV = 0;
 
   int verticalSpacing = 10;
   int horizontalSpacing = 10;
+  double padding = 10.0;
+  double aspectRatio = 0.8;
+  double radius = 5.0;
+
+  double cancelButtonOffsetScaleH = 0.7;
+  double cancelButtonOffsetScaleW = 0.65;
+  double cancelButtonSize = 30;
+
+  double itemWidth;
+  double itemHeight;
 
   List<int> setSelectionWidgetPos(){
-    if (imageWidgets.length == 9){
+    if (imageWidgets.length == maxImageNumber){
         gridV = -1;
         gridH = -1;
     } else {
-        gridV = (imageWidgets.length / 3.0).floor();
-        gridH = (imageWidgets.length - gridV*3);
+        gridV = (imageWidgets.length / gridSize).floor();
+        gridH = (imageWidgets.length - gridV * gridSize);
     }
   }
 
-  Widget buildWidget(index, imageFile){
+  Widget buildWidget(index, File imageFile){
     return Stack(
       children: [
         ClipRRect(
-          borderRadius: new BorderRadius.circular(5.0),
+          borderRadius: BorderRadius.circular(radius),
           child: Container(
             child: Image.file(
-              imageFile,
-              fit: BoxFit.cover,
+                imageFile,
+                fit: BoxFit.cover
             ),
-            width: (MediaQuery.of(context).size.width-40)/3,
-            height: (MediaQuery.of(context).size.width-40)/3/0.80,
+            width: itemWidth,
+            height: itemHeight,
           ),
         ),
         Positioned(
-            left: (MediaQuery.of(context).size.width-40)/3 * 0.65,
-            top: (MediaQuery.of(context).size.width-40)/3 * 0.65 / 0.72,
+            left: itemWidth * cancelButtonOffsetScaleW,
+            top: itemHeight * cancelButtonOffsetScaleH,
             child: IconButton(
                   icon: Icon(
                     Icons.cancel,
                     color: Colors.blue,
-                    size: 30,
+                    size: cancelButtonSize,
                   ),
                   onPressed: () => setState(() {
                     for (int i=0 ; i<images.length ; i++){
                       if (imageFile.toString() == imageFiles[i].toString()) {
                         images.removeAt(i);
-                        imageFiles.removeAt(i);
                         imageWidgets.removeAt(i);
+                        imageFiles.removeAt(i);
                         setSelectionWidgetPos();
                         break;
                       }
@@ -99,84 +108,74 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void pickAsset() async {
-    List<AssetEntity> imagesTmp = await PhotoPicker.pickAsset(
-      context: context,
-      // BuildContext requied
 
-      /// The following are optional parameters.
-      themeColor: Colors.orange,
-      // the title color and bottom color
-      padding: 1.0,
-      // item padding
-      dividerColor: Colors.grey,
-      // divider color
-      disableColor: Colors.white,
-      // the check box disable color
-      itemRadio: 0.88,
-      // the content item radio
-      maxSelected: maxImageNumber,
-      // max picker image count
-      provider: I18nProvider.chinese,
-      // i18n provider ,default is chinese. , you can custom I18nProvider or use ENProvider()
-      rowCount: 4,
-      // item row count
-      textColor: Colors.black,
-      // text color
-      thumbSize: (MediaQuery.of(context).size.width/4.0).floor(),
-      // preview thumb size , default is 64
-      sortDelegate: SortDelegate.common,
-      // default is common ,or you make custom delegate to sort your gallery
-      checkBoxBuilderDelegate: DefaultCheckBoxBuilderDelegate(
-        activeColor: Colors.white,
-        unselectedColor: Colors.white,
-        checkColor: Colors.blue,
-      ), // default is DefaultCheckBoxBuilderDelegate ,or you make custom delegate to create checkbox
+    try {
 
-      // loadingDelegate: this, // if you want to build custom loading widget,extends LoadingDelegate [see example/lib/main.dart]
+      List<Asset> imagesTmp = await MultiImagePicker.pickImages(
+        maxImages: maxImageNumber,
+        enableCamera: false,
+        selectedAssets: images,
+        cupertinoOptions: CupertinoOptions(takePhotoIcon: "chat"),
+        materialOptions: MaterialOptions(
+          actionBarColor: "#abcdef",
+          actionBarTitle: "PIE",
+          allViewTitle: "All Photos",
+          useDetailsView: false,
+          selectCircleStrokeColor: "#000000",
+        ),
+      );
 
-      badgeDelegate: const DefaultBadgeDelegate(), /// or custom class extends [BadgeDelegate]
+      List<File> imageFilesTmp = <File>[];
+      await Future.forEach(imagesTmp, (asset) async {
+        await FlutterAbsolutePath.getAbsolutePath(asset.identifier).then((path) {
+          imageFilesTmp.add(File(path));
+          print("path---" + path);
+        }).catchError((e) {
+          print("photoerr" + e.toString());
+        });
+      });
 
-      pickType: PickType.onlyImage, // all/image/video
+      List<Widget> imageWidgetsTmp = <Widget>[];
+      for ( int i = 0 ; i < imagesTmp.length ; i++ ){
+        imageWidgetsTmp.add(buildWidget(i, imageFilesTmp[i]));
+      }
 
-      pickedAssetList: images, /// when [photoPathList] is not null , [pickType] invalid .
-    );
+      setState(() {
+        images = imagesTmp;
+        imageWidgets = imageWidgetsTmp;
+        imageFiles = imageFilesTmp;
+        setSelectionWidgetPos();
+      });
 
-    List<File> imageFilesTmp = <File>[];
-    List<Widget> imageWidgetsTmp = <Widget>[];
-    for ( int i = 0 ; i < imagesTmp.length ; i++ ){
-      File original_file = await imagesTmp[i].file;
-      imageFilesTmp.add(original_file);
-      imageWidgetsTmp.add(buildWidget(i, original_file));
+    } on Exception catch (e) {
+      String error = e.toString();
+      return; // the image list remains unchanged
     }
-
-    setState(() {
-      images = imagesTmp;
-      imageFiles = imageFilesTmp;
-      imageWidgets = imageWidgetsTmp;
-      setSelectionWidgetPos();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
 
+    itemWidth = ((MediaQuery.of(context).size.width - padding - gridSize * horizontalSpacing ) / gridSize);
+    itemHeight = (itemWidth/aspectRatio);
+
     void _onReorder(int oldIndex, int newIndex) {
       setState(() {
         Widget row = imageWidgets.removeAt(oldIndex);
         imageWidgets.insert(newIndex, row);
+        Asset image = images.removeAt(oldIndex);
+        images.insert(newIndex, image);
         File imageFile = imageFiles.removeAt(oldIndex);
         imageFiles.insert(newIndex, imageFile);
-        AssetEntity image = images.removeAt(oldIndex);
-        images.insert(newIndex, image);
       });
     }
 
-    var wrap = ReorderableWrap(
-        minMainAxisCount: 3,
-        maxMainAxisCount: 3,
-        spacing: 10.0,
-        runSpacing: 10.0,
-        padding: const EdgeInsets.all(10),
+    Widget wrap = ReorderableWrap(
+        minMainAxisCount: gridSize,
+        maxMainAxisCount: gridSize,
+        spacing: horizontalSpacing.toDouble(),
+        runSpacing: verticalSpacing.toDouble(),
+        padding: EdgeInsets.all(padding),
         children: imageWidgets,
         onReorder: _onReorder,
         onNoReorder: (int index) {
@@ -207,8 +206,8 @@ class _MyHomePageState extends State<MyHomePage> {
               wrap,
               gridV == -1 ? Container() : Positioned(
                 child: selectionCard(),
-                left: 10 + ( (MediaQuery.of(context).size.width-40)/3 + 10 ) * gridH,
-                top: 10 + ( (MediaQuery.of(context).size.width-40)/3/0.80 + 10 ) * gridV,
+                left: padding + ( itemWidth + horizontalSpacing ) * gridH,
+                top: padding + ( itemHeight + verticalSpacing ) * gridV,
               ),
             ],
           ),
@@ -219,14 +218,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Widget selectionCard() => GestureDetector(
     onTap: pickAsset,
-    child:   Container(
+    child: Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(5.0),
-        border: Border.all(color: Colors.black),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: Colors.black),
+      boxShadow: null,
       ),
-      width: (MediaQuery.of(context).size.width-40)/3,
-      height: (MediaQuery.of(context).size.width-40)/3/0.80,
+      width: itemWidth,
+      height: itemHeight,
       child: Icon(
           Icons.add
       ),
@@ -236,25 +236,25 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget displayCard(Color color) => Container(
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(5.0),
+      borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: Colors.transparent),
     ),
-    width: (MediaQuery.of(context).size.width-40)/3,
-    height: (MediaQuery.of(context).size.width-40)/3/0.80,
+    width: itemWidth,
+    height: itemHeight,
   );
 
   Widget buildGridView() {
     return Padding(
-      padding: EdgeInsets.only(left: 10, right: 10, top: 10),
+      padding: EdgeInsets.all(padding),
       child: GridView.count(
         controller: ScrollController(),
         shrinkWrap: true,
-        crossAxisCount: 3,
-        childAspectRatio: 0.80,
+        crossAxisCount: gridSize,
+        childAspectRatio: aspectRatio,
         mainAxisSpacing: verticalSpacing.toDouble(),
         crossAxisSpacing: horizontalSpacing.toDouble(),
         children: List.generate(maxImageNumber, (index) {
-          if ( index < imageWidgets.length ) {
+          if ( index <= imageWidgets.length ) {
             return displayCard(Colors.transparent);
           } else {
             return displayCard(Colors.black12);
